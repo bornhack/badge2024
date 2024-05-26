@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "lis2dh12")(type "Legacy")(uri "/Users/tf/Documents/Libraries/KiCad_flummer.net/lis2dh12.lib")(options "")(descr ""))
+)
