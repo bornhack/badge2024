@@ -1,0 +1,15 @@
+[package]
+name = "diodes"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+bhbadge2024.path = "../../libs/bhbadge2024"
+esp-hal-embassy = "0.1.0"
+esp-hal = { version = "0.18.0", features = ["esp32c3", "async"] }
+embassy-executor = { version = "0.5.0", features = ["nightly"] }
+embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
+esp-println = "0.9.1"
+
+static_cell = "2.1.0"
