@@ -1,0 +1,23 @@
+[package]
+name = "usb-serial-echo-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-131072"] }
+embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
+embedded-io-async = "0.6.1"
+esp-hal = { version = "=1.0.0-rc.0", features = ["esp32c3", "unstable"] }
+esp-hal-embassy = { version = "0.9.0", features = ["esp32c3"] }
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
