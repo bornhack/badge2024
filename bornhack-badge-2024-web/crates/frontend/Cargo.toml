@@ -8,6 +8,7 @@ feature-creep-types.workspace = true
 
 leptos.workspace = true
 leptos-use.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 leptos_dom.workspace = true
 rand.workspace = true

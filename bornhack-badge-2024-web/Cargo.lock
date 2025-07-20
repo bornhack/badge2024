@@ -1147,6 +1147,7 @@ dependencies = [
  "leptos-use",
  "leptos_dom",
  "rand",
+ "serde",
  "serde_json",
  "wasm-bindgen",
 ]

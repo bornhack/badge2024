@@ -1,6 +1,10 @@
+mod binary_json;
+
 use feature_creep_types::{Command, Message};
-use leptos::{ev::Event, prelude::*, server::codee::string::JsonSerdeCodec};
+use leptos::{ev::Event, prelude::*};
 use leptos_use::{core::ConnectionReadyState, use_websocket, UseWebSocketReturn};
+
+use crate::binary_json::BinaryJsonSerdeCodec;
 
 fn main() {
     mount_to_body(|| App())
@@ -49,7 +53,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         message,
         send,
         ..
-    } = use_websocket::<Vec<u8>, Vec<u8>, JsonSerdeCodec>(&ws_url);
+    } = use_websocket::<Vec<u8>, Vec<u8>, BinaryJsonSerdeCodec>(&ws_url);
 
     let colors: Vec<_> = (0..16).map(|_| signal("#00000000".to_string())).collect();
 
