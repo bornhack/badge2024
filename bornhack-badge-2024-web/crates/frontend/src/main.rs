@@ -53,7 +53,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         message,
         send,
         ..
-    } = use_websocket::<Vec<u8>, Vec<u8>, BinaryJsonSerdeCodec>(&ws_url);
+    } = use_websocket::<Command, Message, BinaryJsonSerdeCodec>(&ws_url);
 
     let colors: Vec<_> = (0..16).map(|_| signal("#00000000".to_string())).collect();
 
@@ -63,8 +63,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         let colors = colors.clone();
         Effect::new(move |_| {
             if let Some(m) = message.get() {
-                let res: Message = serde_json::from_slice(&m).unwrap();
-                match res {
+                match m {
                     Message::CurrentColors(cur_colors) => {
                         for ((r, g, b), signal) in cur_colors.iter().zip(&colors) {
                             signal.1.set(format!("#{r:02x}{g:02x}{b:02x}"));
@@ -82,15 +81,12 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         let send = send.clone();
         move |_| {
             for index in 0..16 {
-                send(
-                    &serde_json::to_vec(&Command::ChangeColor {
-                        index,
-                        rgb: (0, 0, 0),
-                    })
-                    .unwrap(),
-                );
+                send(&Command::ChangeColor {
+                    index,
+                    rgb: (0, 0, 0),
+                });
             }
-            send(&serde_json::to_vec(&Command::QueryColors).unwrap());
+            send(&Command::QueryColors);
         }
     };
 
@@ -98,15 +94,12 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         let send = send.clone();
         move |_| {
             for index in 0..16 {
-                send(
-                    &serde_json::to_vec(&Command::ChangeColor {
-                        index,
-                        rgb: rand::random(),
-                    })
-                    .unwrap(),
-                );
+                send(&Command::ChangeColor {
+                    index,
+                    rgb: rand::random(),
+                });
             }
-            send(&serde_json::to_vec(&Command::QueryColors).unwrap());
+            send(&Command::QueryColors);
         }
     };
 
@@ -115,7 +108,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         Effect::new(move |_| {
             let state = ready_state.get();
             if matches!(state, ConnectionReadyState::Open) {
-                send(&serde_json::to_vec(&Command::QueryColors).unwrap());
+                send(&Command::QueryColors);
             }
         });
     }
@@ -155,7 +148,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
 fn Led(
     index: usize,
     color: (ReadSignal<String>, WriteSignal<String>),
-    send_func: impl Fn(&Vec<u8>) + 'static,
+    send_func: impl Fn(&Command) + 'static,
 ) -> impl IntoView {
     let (color, set_color) = color;
 
@@ -169,7 +162,7 @@ fn Led(
                 let r = u8::from_str_radix(&new_value[1..3], 16).unwrap();
                 let g = u8::from_str_radix(&new_value[3..5], 16).unwrap();
                 let b = u8::from_str_radix(&new_value[5..7], 16).unwrap();
-                send_func(&serde_json::to_vec(&Command::ChangeColor { index: index as u8, rgb: (r,g,b) }).unwrap() );
+                send_func(&Command::ChangeColor { index: index as u8, rgb: (r,g,b) });
                 set_color.set(new_value);
         } />
     }
