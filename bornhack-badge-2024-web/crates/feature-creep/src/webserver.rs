@@ -4,6 +4,7 @@ use crate::{
 };
 use embassy_executor::Spawner;
 use embassy_futures::select::Either;
+use embassy_net::Stack;
 use embassy_sync::{
     blocking_mutex::raw::NoopRawMutex,
     pubsub::{PubSubChannel, Subscriber, WaitResult},
@@ -143,7 +144,8 @@ async fn websocket(
         .await
 }
 
-fn make_app() -> picoserve::Router<AppRouter, &'static AppState> {
+fn make_app(
+) -> picoserve::Router<impl picoserve::routing::PathRouter<&'static AppState>, &'static AppState> {
     // static INDEX: &str = include_str!("../dist/index.html");
     Router::new()
         // .route("/", get(|| webserver_file::File::html(INDEX)))
@@ -182,38 +184,31 @@ pub struct AppState {
     pub channel: PubSubChannel<NoopRawMutex, (F32x3, f32), 1, WEB_TASK_POOL_SIZE, 1>,
 }
 
-type AppRouter = impl picoserve::routing::PathRouter<&'static AppState>;
-type App = picoserve::Router<AppRouter, &'static AppState>;
-
-pub async fn init(spawner: &Spawner, stack: &'static Stack, app_state: &'static AppState) {
-    // We cannot use static_cell::make_static because of https://github.com/embassy-rs/static-cell/issues/16
-    static APP: static_cell::StaticCell<App> = static_cell::StaticCell::new();
-    let app = APP.init(make_app());
-
-    static CONFIG: static_cell::StaticCell<picoserve::Config<embassy_time::Duration>> =
-        static_cell::StaticCell::new();
-    let config = CONFIG.init(
+pub async fn init(spawner: &Spawner, stack: Stack<'static>, app_state: &'static AppState) {
+    let config = mk_static!(
+        picoserve::Config<Duration>,
         picoserve::Config::new(picoserve::Timeouts {
             start_read_request: Some(Duration::from_secs(5)),
+            persistent_start_read_request: Some(Duration::from_secs(1)),
             read_request: Some(Duration::from_secs(1)),
             write: Some(Duration::from_secs(1)),
         })
-        .keep_connection_alive(),
+        .keep_connection_alive()
     );
 
     for id in 0..WEB_TASK_POOL_SIZE {
-        spawner.must_spawn(web_task(id, stack, app, config, app_state));
+        spawner.must_spawn(web_task(id, stack, config, app_state));
     }
 }
 
 #[embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE)]
 async fn web_task(
     id: usize,
-    stack: &'static Stack,
-    app: &'static App,
+    stack: Stack<'static>,
     config: &'static picoserve::Config<Duration>,
     state: &'static AppState,
 ) -> ! {
+    let app = make_app();
     let port = 80;
     let mut tcp_rx_buffer = [0; 1024];
     let mut tcp_tx_buffer = [0; 1024];
@@ -221,7 +216,7 @@ async fn web_task(
 
     picoserve::listen_and_serve_with_state(
         id,
-        app,
+        &app,
         config,
         stack,
         port,

@@ -73,27 +73,8 @@ impl picoserve::response::Content for File {
         self.body.len()
     }
 
-    async fn write_content<R: picoserve::io::Read, W: picoserve::io::Write>(
-        self,
-        _connection: picoserve::response::Connection<'_, R>,
-        mut writer: W,
-    ) -> Result<(), W::Error> {
+    async fn write_content<W: picoserve::io::Write>(self, mut writer: W) -> Result<(), W::Error> {
         writer.write_all(self.body).await
-    }
-}
-
-impl picoserve::response::IntoResponse for File {
-    async fn write_to<
-        R: picoserve::io::Read,
-        W: picoserve::response::ResponseWriter<Error = R::Error>,
-    >(
-        self,
-        connection: picoserve::response::Connection<'_, R>,
-        response_writer: W,
-    ) -> Result<picoserve::ResponseSent, W::Error> {
-        response_writer
-            .write_response(connection, self.into_response())
-            .await
     }
 }
 
