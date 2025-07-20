@@ -2,9 +2,16 @@
 #![no_main]
 #![allow(long_running_const_eval)]
 
+use esp_backtrace as _;
+
+#[macro_use]
+pub mod macros;
+pub mod lis2dh12;
+pub mod shared_i2c;
 pub mod webserver;
 mod webserver_file;
 pub mod wifi;
+pub mod ws2812b;
 
 use bhbadge2024::{
     lis2dh12::{F32x3, Lis2dh12},

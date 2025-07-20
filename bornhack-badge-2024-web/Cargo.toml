@@ -4,7 +4,6 @@ exclude = ["crates/frontend"]
 resolver = "2"
 
 [workspace.dependencies]
-bhbadge2024 = { path = "crates/bhbadge2024" }
 feature-creep = { path = "crates/feature-creep" }
 feature-creep-types = { path = "crates/feature-creep-types" }
 frontend = { path = "crates/frontend" }

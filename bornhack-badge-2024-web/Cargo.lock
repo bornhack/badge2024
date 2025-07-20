@@ -48,26 +48,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bhbadge2024"
-version = "0.1.0"
-dependencies = [
- "accelerometer",
- "cast",
- "embassy-executor",
- "embassy-sync 0.7.0",
- "embassy-time",
- "esp-backtrace",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "esp-wifi",
- "micromath 2.1.0",
- "num-derive",
- "num-traits",
- "static_cell",
-]
-
-[[package]]
 name = "bitfield"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -768,17 +748,22 @@ checksum = "02a3229bec56a977f174b32fe7b8d89e8c79ebb4493d10ad763b6676dc2dc0c9"
 name = "feature-creep"
 version = "0.1.0"
 dependencies = [
- "bhbadge2024",
+ "accelerometer",
+ "cast",
  "embassy-executor",
  "embassy-futures",
  "embassy-net",
  "embassy-sync 0.7.0",
  "embassy-time",
+ "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
  "esp-wifi",
  "feature-creep-types",
+ "micromath 2.1.0",
+ "num-derive",
+ "num-traits",
  "picoserve",
  "serde-json-core 0.5.1",
  "static_cell",
