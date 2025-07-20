@@ -1,0 +1,8 @@
+[package]
+name = "feature-creep-types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0.204", default-features = false, features = ["derive"] }
+serde-json-core = "0.5.1"

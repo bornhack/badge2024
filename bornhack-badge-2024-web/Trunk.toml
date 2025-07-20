@@ -1,0 +1,18 @@
+[build]
+target = "frontend/index.html"
+filehash = false
+dist = "apps/feature-creep/dist"
+public_url = "/"
+
+[tools]
+tailwindcss = "3.3.5"
+
+# dev board
+# [[proxy]]
+# backend = "ws://192.168.1.242/ws"
+# ws = true
+
+# badge
+# [[proxy]]
+# backend = "ws://192.168.1.171/ws"
+# ws = true
