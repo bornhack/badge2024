@@ -2,5 +2,10 @@
     "rust-analyzer.cargo.target": "riscv32imc-unknown-none-elf",
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.targetDir": true,
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "rust-analyzer.cargo.extraEnv": {
+        "SSID": "test",
+        "PASSWORD": "test",
+        "DEVICE_BANNER": "test"
+    },
 }

@@ -2,7 +2,10 @@
 #![no_main]
 #![allow(long_running_const_eval)]
 
+extern crate alloc;
+
 use esp_backtrace as _;
+use esp_hal_embassy::main;
 
 #[macro_use]
 pub mod macros;
@@ -13,24 +16,14 @@ mod webserver_file;
 pub mod wifi;
 pub mod ws2812b;
 
-use bhbadge2024::{
-    lis2dh12::{F32x3, Lis2dh12},
-    shared_i2c,
-    ws2812b::Ws2812b,
-};
+use crate::lis2dh12::{F32x3, Lis2dh12};
 use embassy_executor::Spawner;
 use embassy_sync::{
     blocking_mutex::raw::NoopRawMutex,
     pubsub::{PubSubChannel, Publisher},
 };
 use embassy_time::Timer;
-use esp_hal::{
-    clock::ClockControl, gpio::Io, i2c::I2C, interrupt::Priority, peripherals::Peripherals,
-    prelude::*, rmt::Rmt, system::SystemControl, timer::timg::TimerGroup,
-};
-use esp_hal_embassy::InterruptExecutor;
-use esp_wifi::wifi::{AuthMethod, ClientConfiguration};
-use static_cell::StaticCell;
+use esp_hal::{clock::CpuClock, i2c::master::I2c, rng::Rng, time::Rate};
 use webserver::{AppState, WEB_TASK_POOL_SIZE};
 
 #[macro_export]
@@ -45,39 +38,22 @@ macro_rules! mk_static {
 
 #[main]
 async fn main(spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timer_group0);
+    let timer0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
+    esp_hal_embassy::init(timer0.timer0);
 
-    static EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-    let executor = EXECUTOR.init(InterruptExecutor::new(
-        system.software_interrupt_control.software_interrupt1,
-    ));
-    let high_priority_spawner = executor.start(Priority::Priority2);
+    let ws2812b = ws2812b::init_ws2812b(
+        spawner,
+        peripherals.SPI2,
+        peripherals.GPIO10,
+        peripherals.DMA_CH0,
+    );
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let timer1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
+    let rng = Rng::new(peripherals.RNG);
 
-    let rmt = Rmt::new_async(peripherals.RMT, 80.MHz(), &clocks).unwrap();
-
-    let ws2812b = Ws2812b::new(&high_priority_spawner, rmt.channel0, io.pins.gpio10);
-
-    let stack = wifi::init(
-        &spawner,
-        ClientConfiguration {
-            ssid: "bornhack".try_into().unwrap(),
-            auth_method: AuthMethod::None,
-            ..Default::default()
-        },
-        &clocks,
-        peripherals.SYSTIMER,
-        peripherals.RNG,
-        peripherals.RADIO_CLK,
-        peripherals.WIFI,
-    )
-    .await;
+    let stack = wifi::init_wifi(&spawner, timer1.timer0, rng, peripherals.WIFI).await;
 
     let channel = PubSubChannel::<NoopRawMutex, (F32x3, f32), 1, WEB_TASK_POOL_SIZE, 1>::new();
     let app_state: &'static AppState = mk_static!(AppState, AppState { ws2812b, channel });
@@ -85,13 +61,18 @@ async fn main(spawner: Spawner) {
 
     webserver::init(&spawner, stack, app_state).await;
 
-    let shared_i2c = shared_i2c::SharedI2c::new(I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio6,
-        io.pins.gpio7,
-        4.kHz(),
-        &clocks,
-    ));
+    let shared_i2c = shared_i2c::SharedI2c::new(
+        I2c::new(
+            peripherals.I2C0,
+            esp_hal::i2c::master::Config::default()
+                .with_frequency(Rate::from_khz(4))
+                .with_software_timeout(esp_hal::i2c::master::SoftwareTimeout::None),
+        )
+        .unwrap()
+        .with_sda(peripherals.GPIO6)
+        .with_scl(peripherals.GPIO7)
+        .into_async(),
+    );
 
     init_lis2dh12(&spawner, shared_i2c, publisher).await;
 
@@ -128,26 +109,14 @@ async fn init_lis2dh12(
     shared_i2c: shared_i2c::SharedI2c,
     publisher: Publisher<'static, NoopRawMutex, (F32x3, f32), 1, WEB_TASK_POOL_SIZE, 1>,
 ) {
-    let mut lis2dh12 = Lis2dh12::new(
-        shared_i2c,
-        bhbadge2024::lis2dh12::SlaveAddr::Alternative(true),
-    )
-    .await
-    .unwrap();
+    let mut lis2dh12 = Lis2dh12::new(shared_i2c, lis2dh12::SlaveAddr::Alternative(true))
+        .await
+        .unwrap();
 
     lis2dh12.reset().await.unwrap();
-    lis2dh12
-        .set_odr(bhbadge2024::lis2dh12::Odr::Hz400)
-        .await
-        .unwrap();
-    lis2dh12
-        .set_mode(bhbadge2024::lis2dh12::Mode::Normal)
-        .await
-        .unwrap();
-    lis2dh12
-        .set_fs(bhbadge2024::lis2dh12::FullScale::G16)
-        .await
-        .unwrap();
+    lis2dh12.set_odr(lis2dh12::Odr::Hz400).await.unwrap();
+    lis2dh12.set_mode(lis2dh12::Mode::Normal).await.unwrap();
+    lis2dh12.set_fs(lis2dh12::FullScale::G16).await.unwrap();
     lis2dh12.enable_axis((true, true, true)).await.unwrap();
     lis2dh12.enable_temp(true).await.unwrap();
 

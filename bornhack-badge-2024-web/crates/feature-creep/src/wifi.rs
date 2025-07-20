@@ -1,63 +1,55 @@
+use alloc::string::String;
 use embassy_executor::Spawner;
-use embassy_net::{Config, StackResources};
+use embassy_net::{Runner, Stack, StackResources};
 use embassy_time::{Duration, Timer};
-use esp_hal::{
-    clock::Clocks,
-    peripheral::Peripheral,
-    peripherals::{RNG, SYSTIMER},
-    rng::Rng,
-};
+use esp_hal::{peripherals::WIFI, rng::Rng};
 use esp_println::println;
 use esp_wifi::{
-    initialize,
     wifi::{
-        ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
-        WifiState,
+        ClientConfiguration, Configuration, EapClientConfiguration, TtlsPhase2Method,
+        WifiController, WifiDevice, WifiEvent, WifiState,
     },
-    EspWifiInitFor,
+    EspWifiController,
 };
 
-use crate::{mk_static, webserver::WEB_TASK_POOL_SIZE};
+const SSID: &str = env!("SSID");
+const USERNAME: Option<&str> = option_env!("USERNAME");
+const PASSWORD: &str = env!("PASSWORD");
 
-pub type Stack = embassy_net::Stack<WifiDevice<'static, WifiStaDevice>>;
+pub const MAX_CONNECTIONS: usize = 5;
 
-pub async fn init(
+pub async fn init_wifi(
     spawner: &Spawner,
-    client_config: ClientConfiguration,
-    clocks: &Clocks<'_>,
-    systimer: impl Peripheral<P = SYSTIMER>,
-    rng: impl Peripheral<P = RNG>,
-    radio_clocks: esp_hal::peripherals::RADIO_CLK,
-    wifi: esp_hal::peripherals::WIFI,
-) -> &'static Stack {
-    let timer = esp_hal::timer::systimer::SystemTimer::new(systimer).alarm0;
-
-    let mut rng = Rng::new(rng);
-    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
-
-    let init = initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks).unwrap();
-
-    let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
-
-    let config = Config::dhcpv4(Default::default());
-
-    // Init network stack
-    let stack = &*mk_static!(
-        Stack,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(
-                StackResources<{ WEB_TASK_POOL_SIZE + 1 }>,
-                StackResources::<{ WEB_TASK_POOL_SIZE + 1 }>::new()
-            ),
-            seed
-        )
+    timer: esp_hal::timer::timg::Timer<'static>,
+    mut rng: Rng,
+    wifi: WIFI<'static>,
+) -> Stack<'static> {
+    let init = mk_static!(
+        EspWifiController<'static>,
+        esp_wifi::init(timer, rng).unwrap()
     );
 
-    spawner.spawn(connection(client_config, controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
+    let (controller, wifi_interfaces) = esp_wifi::wifi::new(init, wifi).unwrap();
+
+    let config = embassy_net::Config::dhcpv4(Default::default());
+
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+
+    println!("max connections = {MAX_CONNECTIONS}");
+
+    // Init network stack
+    let (stack, runner) = embassy_net::new(
+        wifi_interfaces.sta,
+        config,
+        mk_static!(
+            StackResources<{ 2 + MAX_CONNECTIONS }>,
+            StackResources::new()
+        ),
+        seed,
+    );
+
+    spawner.spawn(connection(controller)).unwrap();
+    spawner.spawn(net_task(runner)).unwrap();
 
     loop {
         if stack.is_link_up() {
@@ -75,15 +67,17 @@ pub async fn init(
         Timer::after(Duration::from_millis(500)).await;
     }
 
+    spawner.spawn(resolve_google_in_loop(stack)).unwrap();
+
     stack
 }
 
 #[embassy_executor::task]
-async fn connection(config: ClientConfiguration, mut controller: WifiController<'static>) {
+async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::get_wifi_state() {
+        match esp_wifi::wifi::wifi_state() {
             WifiState::StaConnected => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::StaDisconnected).await;
@@ -92,25 +86,55 @@ async fn connection(config: ClientConfiguration, mut controller: WifiController<
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::Client(config.clone());
+            let client_config = if let Some(username) = USERNAME {
+                Configuration::EapClient(EapClientConfiguration {
+                    ssid: String::from(SSID),
+                    auth_method: esp_wifi::wifi::AuthMethod::WPA2Enterprise,
+                    username: Some(String::from(username)),
+                    password: Some(String::from(PASSWORD)),
+                    ttls_phase2_method: Some(TtlsPhase2Method::Pap),
+                    ..Default::default()
+                })
+            } else {
+                Configuration::Client(ClientConfiguration {
+                    ssid: String::from(SSID),
+                    auth_method: esp_wifi::wifi::AuthMethod::WPA2Personal,
+                    password: String::from(PASSWORD),
+                    ..Default::default()
+                })
+            };
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
             println!("Wifi started!");
         }
         println!("About to connect...");
 
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(_) => println!("Wifi connected!"),
             Err(e) => {
                 println!("Failed to connect to wifi: {e:?}");
-                Timer::after(Duration::from_millis(5000)).await
+                Timer::after(Duration::from_secs(90)).await
             }
         }
     }
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+    runner.run().await
+}
+
+#[embassy_executor::task]
+async fn resolve_google_in_loop(stack: Stack<'static>) {
+    loop {
+        println!(
+            "Resolved google: {:?}",
+            stack
+                .dns_query("google.com", smoltcp::wire::DnsQueryType::A)
+                .await
+        );
+
+        Timer::after_secs(2).await;
+    }
 }

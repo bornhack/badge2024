@@ -1,5 +1,7 @@
-use crate::wifi::Stack;
-use bhbadge2024::{lis2dh12::F32x3, ws2812b::Ws2812b};
+use crate::{
+    lis2dh12::F32x3,
+    ws2812b::{Pixel, Ws2812b},
+};
 use embassy_executor::Spawner;
 use embassy_futures::select::Either;
 use embassy_sync::{
@@ -48,17 +50,24 @@ impl ws::WebSocketCallback for WebsocketHandler {
                         Ok((Command::ChangeColor { index, rgb }, consumed))
                             if data.len() == consumed && index < 16 =>
                         {
-                            self.ws2812b.set_pixel(index as usize, rgb);
+                            self.ws2812b.set_pixel(
+                                index as usize,
+                                Pixel {
+                                    r: rgb.0,
+                                    g: rgb.1,
+                                    b: rgb.2,
+                                },
+                            );
                             // There was a race condition. We didn't understand it. Now it is no longer here. ¯\_(ツ)_/¯
                             Timer::after_micros(50).await;
                         }
                         Ok((Command::QueryColors, _consumed)) => {
                             let mut res = [(0u8, 0u8, 0u8); 16];
-                            self.ws2812b.with_frame_buffer(|f| {
-                                for (i, pix) in f.raw_mut().iter().enumerate() {
-                                    res[i].0 = pix[1];
-                                    res[i].1 = pix[0];
-                                    res[i].2 = pix[2];
+                            self.ws2812b.set_pixels(|pixels| {
+                                for (i, pix) in pixels.iter_mut().enumerate() {
+                                    res[i].0 = pix.r;
+                                    res[i].1 = pix.g;
+                                    res[i].2 = pix.b;
                                 }
                             });
 

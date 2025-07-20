@@ -37,12 +37,21 @@ const ONE_PULSE: u8 = 0b1100;
 type BufferMutex = Mutex<CriticalSectionRawMutex, RefCell<PixelArray>>;
 type ActivationSignal = Signal<CriticalSectionRawMutex, ()>;
 
-pub struct Ws2818b {
+#[derive(Copy, Clone)]
+pub struct Ws2812b {
     activation_signal: &'static ActivationSignal,
     frame_buffer: &'static BufferMutex,
 }
 
-impl Ws2818b {
+impl Ws2812b {
+    pub fn set_pixel(&self, index: usize, pixel: Pixel) {
+        assert!(index < NUM_PIXELS);
+        self.frame_buffer.lock(|pixels| {
+            pixels.borrow_mut()[index] = pixel;
+            self.activation_signal.signal(());
+        });
+    }
+
     pub fn set_pixels(&self, f: impl FnOnce(&mut PixelArray)) {
         self.frame_buffer.lock(|pixels| {
             f(&mut pixels.borrow_mut());
@@ -56,7 +65,7 @@ pub fn init_ws2812b(
     spi2: esp_hal::peripherals::SPI2<'static>,
     gpio10: esp_hal::peripherals::GPIO10<'static>,
     dma_ch0: esp_hal::peripherals::DMA_CH0<'static>,
-) -> Ws2818b {
+) -> Ws2812b {
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(NUM_SPI_BYTES);
     let dma_rx_buf = dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -86,7 +95,7 @@ pub fn init_ws2812b(
         .spawn(handler(spidma, mutex, activation_signal))
         .unwrap();
 
-    Ws2818b {
+    Ws2812b {
         activation_signal,
         frame_buffer: mutex,
     }

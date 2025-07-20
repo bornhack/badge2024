@@ -766,6 +766,7 @@ dependencies = [
  "num-traits",
  "picoserve",
  "serde-json-core 0.5.1",
+ "smoltcp",
  "static_cell",
 ]
 
@@ -1288,6 +1289,7 @@ dependencies = [
  "byteorder",
  "cfg-if",
  "heapless 0.8.0",
+ "log",
  "managed",
 ]
 
