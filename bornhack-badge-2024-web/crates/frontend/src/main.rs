@@ -12,40 +12,16 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    let (read_input_hostname, write_input_hostname) = signal::<String>("".to_string());
-    let (read_hostname, write_hostname) = signal::<Option<String>>(None);
-
     view! {
         <div class="flex flex-col gap-2 items-center py-8">
-            <div>
-                <input type="text"
-                    placeholder="hostname"
-                    class="py-2 mx-2 border border-blue rounded"
-                    on:input=move |ev| {
-                        write_input_hostname.set(event_target_value(&ev));
-                    }
-                    prop:value=read_input_hostname
-                />
-                <button
-                    on:click=move |_ev| {
-                        write_hostname.set(Some(read_input_hostname.get()));
-                    }
-                    class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
-                >
-                    Connect
-                </button>
-            </div>
-            <Show when=move || read_hostname.get().is_some()>
-                {move || {
-                    view! { <InitializedApp hostname=read_hostname.get().unwrap_or_default()/> }
-                }}
-            </Show>
+            <InitializedApp />
         </div>
     }
 }
 
 #[component]
-fn InitializedApp(hostname: String) -> impl IntoView {
+fn InitializedApp() -> impl IntoView {
+    let hostname = document().location().unwrap().host().unwrap();
     let ws_url = format!("ws://{}/ws", hostname);
 
     let UseWebSocketReturn {

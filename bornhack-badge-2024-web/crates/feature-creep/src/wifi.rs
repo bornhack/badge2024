@@ -12,9 +12,9 @@ use esp_wifi::{
     EspWifiController,
 };
 
-const SSID: &str = env!("SSID");
-const USERNAME: Option<&str> = option_env!("USERNAME");
-const PASSWORD: &str = env!("PASSWORD");
+const WIFI_SSID: &str = env!("WIFI_SSID");
+const WIFI_USERNAME: Option<&str> = option_env!("WIFI_USERNAME");
+const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
 pub const MAX_CONNECTIONS: usize = 5;
 
@@ -86,23 +86,24 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = if let Some(username) = USERNAME {
+            let client_config = if let Some(username) = WIFI_USERNAME {
                 Configuration::EapClient(EapClientConfiguration {
-                    ssid: String::from(SSID),
+                    ssid: String::from(WIFI_SSID),
                     auth_method: esp_wifi::wifi::AuthMethod::WPA2Enterprise,
                     username: Some(String::from(username)),
-                    password: Some(String::from(PASSWORD)),
+                    password: Some(String::from(WIFI_PASSWORD)),
                     ttls_phase2_method: Some(TtlsPhase2Method::Pap),
                     ..Default::default()
                 })
             } else {
                 Configuration::Client(ClientConfiguration {
-                    ssid: String::from(SSID),
+                    ssid: String::from(WIFI_SSID),
                     auth_method: esp_wifi::wifi::AuthMethod::WPA2Personal,
-                    password: String::from(PASSWORD),
+                    password: String::from(WIFI_PASSWORD),
                     ..Default::default()
                 })
             };
+
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();

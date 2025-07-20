@@ -1,14 +1,11 @@
 [target.riscv32imc-unknown-none-elf]
 runner = "espflash flash --monitor"
-
-[target.wasm32-unknown-unknown]
-rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
-
-[build]
 rustflags = [
   # Required to obtain backtraces (e.g. when using the "esp-backtrace" crate.)
   # NOTE: May negatively impact performance of produced code
   "-C",
   "force-frame-pointers",
 ]
-target = "riscv32imc-unknown-none-elf"
+
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
