@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
@@ -28,13 +28,7 @@
             bashInteractive
 
             # Rust
-            (rust-bin.selectLatestNightlyWith (
-              toolchain:
-              toolchain.default.override {
-                extensions = [ "rust-src" ];
-                targets = [ "riscv32imc-unknown-none-elf" "wasm32-unknown-unknown" ];
-              }
-            ))
+            (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
 
             # Flashing tool
             espflash

@@ -14,20 +14,17 @@ mod reg;
 
 use core::{fmt::Debug, marker::PhantomData};
 
-#[cfg(feature = "out_f32")]
 pub use accelerometer::vector::F32x3;
-pub use accelerometer::{vector::I16x3, ErrorKind};
+pub use accelerometer::{ErrorKind, vector::I16x3};
 use cast::u16;
-#[cfg(feature = "out_f32")]
 use cast::{f32, i16};
-#[cfg(feature = "out_f32")]
 use num_traits::FromPrimitive;
 
 use self::reg::*;
 pub use self::reg::{Aoi6d, FifoMode, FullScale, Mode, Odr};
 use crate::shared_i2c::SharedI2c;
 
-type Error = accelerometer::Error<esp_hal::i2c::Error>;
+type Error = accelerometer::Error<esp_hal::i2c::master::Error>;
 
 /// Possible slave addresses
 pub enum SlaveAddr {
@@ -67,7 +64,6 @@ pub struct Lis2dh12 {
     /// The I²C device slave address
     addr: u8,
     /// Current full-scale
-    #[cfg(feature = "out_f32")]
     fs: FullScale,
 }
 
@@ -83,7 +79,6 @@ impl Lis2dh12 {
         let mut dev = Self {
             i2c,
             addr: addr.addr(),
-            #[cfg(feature = "out_f32")]
             fs: FullScale::G2,
         };
 
@@ -97,7 +92,7 @@ impl Lis2dh12 {
 
     /// `WHO_AM_I` register
     pub async fn get_device_id(&mut self) -> Result<u8, Error> {
-        self.read_reg(Register::WHO_AM_I).await.map_err(Into::into)
+        Ok(self.read_reg(Register::WHO_AM_I).await?)
     }
 
     /// Operating mode selection,
@@ -235,7 +230,6 @@ impl Lis2dh12 {
     pub async fn set_fs(&mut self, fs: FullScale) -> Result<(), Error> {
         self.modify_reg(Register::CTRL_REG4, |v| (v & !FS_MASK) | ((fs as u8) << 4))
             .await?;
-        #[cfg(feature = "out_f32")]
         {
             self.fs = fs;
         }
@@ -461,7 +455,6 @@ impl Lis2dh12 {
 
     /// Click threshold as f32,
     /// `CLICK_THS`: `Ths`
-    #[cfg(feature = "out_f32")]
     pub async fn set_click_thsf(&mut self, ths: f32) -> Result<(), Error> {
         self.set_click_ths(self.fs.convert_ths_f32tou8(ths)).await
     }
@@ -496,7 +489,6 @@ impl Lis2dh12 {
 
     /// Sleep-to-wake, return-to-sleep activation threshold as f32,
     /// `ACT_THS`: `Acth`
-    #[cfg(feature = "out_f32")]
     pub async fn set_act_thsf(&mut self, ths: f32) -> Result<(), Error> {
         self.set_act_ths(self.fs.convert_ths_f32tou8(ths)).await
     }
@@ -539,7 +531,6 @@ impl Lis2dh12 {
 
     /// Temperature sensor data as float,
     /// `OUT_TEMP_H`, `OUT_TEMP_L` converted to `f32`
-    #[cfg(feature = "out_f32")]
     pub async fn get_temp_outf(&mut self) -> Result<f32, Error> {
         let (out_h, out_l) = self.get_temp_out().await?;
         // 10-bit resolution
@@ -665,7 +656,7 @@ impl Lis2dh12 {
     }
 
     #[inline]
-    async fn read_reg(&mut self, reg: Register) -> Result<u8, esp_hal::i2c::Error> {
+    async fn read_reg(&mut self, reg: Register) -> Result<u8, esp_hal::i2c::master::Error> {
         let mut buf = [0u8];
         self.i2c
             .write_read(self.addr, &[reg.addr()], &mut buf)
@@ -678,19 +669,27 @@ impl Lis2dh12 {
         &mut self,
         reg: Register,
         buffer: &mut [u8],
-    ) -> Result<(), esp_hal::i2c::Error> {
+    ) -> Result<(), esp_hal::i2c::master::Error> {
         self.i2c
             .write_read(self.addr, &[reg.addr() | I2C_SUB_MULTI], buffer)
             .await
     }
 
     #[inline]
-    async fn write_reg(&mut self, reg: Register, val: u8) -> Result<(), esp_hal::i2c::Error> {
+    async fn write_reg(
+        &mut self,
+        reg: Register,
+        val: u8,
+    ) -> Result<(), esp_hal::i2c::master::Error> {
         self.i2c.write(self.addr, &[reg.addr(), val]).await
     }
 
     #[inline]
-    async fn modify_reg<F>(&mut self, reg: Register, f: F) -> Result<(), esp_hal::i2c::Error>
+    async fn modify_reg<F>(
+        &mut self,
+        reg: Register,
+        f: F,
+    ) -> Result<(), esp_hal::i2c::master::Error>
     where
         F: FnOnce(u8) -> u8,
     {
@@ -700,12 +699,20 @@ impl Lis2dh12 {
     }
 
     #[inline]
-    async fn reg_set_bits(&mut self, reg: Register, bits: u8) -> Result<(), esp_hal::i2c::Error> {
+    async fn reg_set_bits(
+        &mut self,
+        reg: Register,
+        bits: u8,
+    ) -> Result<(), esp_hal::i2c::master::Error> {
         self.modify_reg(reg, |v| v | bits).await
     }
 
     #[inline]
-    async fn reg_reset_bits(&mut self, reg: Register, bits: u8) -> Result<(), esp_hal::i2c::Error> {
+    async fn reg_reset_bits(
+        &mut self,
+        reg: Register,
+        bits: u8,
+    ) -> Result<(), esp_hal::i2c::master::Error> {
         self.modify_reg(reg, |v| v & !bits).await
     }
 
@@ -715,7 +722,7 @@ impl Lis2dh12 {
         reg: Register,
         bits: u8,
         set: bool,
-    ) -> Result<(), esp_hal::i2c::Error> {
+    ) -> Result<(), esp_hal::i2c::master::Error> {
         if set {
             self.reg_set_bits(reg, bits).await
         } else {
@@ -736,7 +743,6 @@ impl Lis2dh12 {
     }
 
     /// Get normalized ±g reading from the accelerometer
-    #[cfg(feature = "out_f32")]
     pub async fn accel_norm(&mut self) -> Result<F32x3, Error> {
         let acc_raw: I16x3 = self.accel_raw().await?;
 
@@ -748,7 +754,6 @@ impl Lis2dh12 {
     }
 
     /// Get sample rate of accelerometer in Hz
-    #[cfg(feature = "out_f32")]
     pub async fn sample_rate(&mut self) -> Result<f32, Error> {
         let creg1 = self.read_reg(Register::CTRL_REG1).await?;
         let rate = match FromPrimitive::from_u8(creg1 >> 4) {
@@ -858,7 +863,6 @@ where
 
     /// Threshold as f32,
     /// `INTx_THS`: `THS`
-    #[cfg(feature = "out_f32")]
     pub async fn set_thsf(&mut self, ths: f32) -> Result<(), Error> {
         self.set_ths(self.dev.fs.convert_ths_f32tou8(ths)).await
     }

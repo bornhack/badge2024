@@ -1,8 +1,6 @@
 #![allow(non_upper_case_globals)]
 
-#[cfg(feature = "out_f32")]
 use cast::f32;
-#[cfg(feature = "out_f32")]
 use num_derive::FromPrimitive;
 
 /// I2C slave address
@@ -100,8 +98,7 @@ pub const HP_IA1: u8 = 0b0000_0001;
 pub const CTRL_REG2_DEFAULT: u8 = 0b0000_0000;
 
 /// Output Data Rate
-#[derive(Copy, Clone)]
-#[cfg_attr(feature = "out_f32", derive(FromPrimitive))]
+#[derive(Copy, Clone, FromPrimitive)]
 pub enum Odr {
     /// Power-down mode
     PowerDown = 0b0000,
@@ -163,7 +160,6 @@ pub enum FullScale {
 }
 
 impl FullScale {
-    #[cfg(feature = "out_f32")]
     pub(crate) fn convert_out_i16tof32(self, val: i16) -> f32 {
         // g/digit for high-resolution mode (12-bit)
         let sens: f32 = match self {
@@ -175,7 +171,6 @@ impl FullScale {
         // up to 12-bit data, left-justified
         f32(val >> 4) * sens
     }
-    #[cfg(feature = "out_f32")]
     pub(crate) fn convert_ths_f32tou8(self, val: f32) -> u8 {
         // 1LSb = x g
         let lsb: f32 = match self {

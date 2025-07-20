@@ -1,251 +1,116 @@
 use core::cell::RefCell;
 
-use embassy_executor::SendSpawner;
 use embassy_sync::{
     blocking_mutex::{raw::CriticalSectionRawMutex, Mutex},
     signal::Signal,
 };
-use embassy_time::Timer;
-use esp_hal::{
-    gpio::OutputPin,
-    peripheral::Peripheral,
-    rmt::{
-        asynch::TxChannelAsync, ChannelCreator, PulseCode, TxChannelConfig, TxChannelCreatorAsync,
-    },
-    Async,
-};
-use micromath::F32Ext;
-use static_cell::ConstStaticCell;
+use esp_hal::{clock::CpuClock, dma, dma_buffers, rng::Rng, spi, time::Rate};
+use esp_println::println;
 
-const PIXEL_COUNT: usize = 16;
+const NUM_PIXELS: usize = 600;
+// 3 colors per pixel, 1 byte per color, 4 bits of spi data per bit of color data
+const NUM_SPI_BYTES: usize = NUM_PIXELS * 3 * 4;
 
-struct CommunicationState {
-    frame_buffer: BufferMutex,
-    activation_signal: ActivationSignal,
+#[derive(Copy, Clone, Debug)]
+struct Pixel {
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
-type BufferMutex = Mutex<CriticalSectionRawMutex, RefCell<[[u8; 3]; PIXEL_COUNT]>>;
+impl Pixel {
+    const BLACK: Pixel = Pixel { r: 0, g: 0, b: 0 };
+}
+
+type PixelArray = [Pixel; NUM_PIXELS];
+type PulseCodeArray = [u8; NUM_SPI_BYTES];
+
+// This corresponds to 350ns of high followed by 1050s of low
+const ZERO_PULSE: u8 = 0b1000;
+// This corresponds to 700 ns of high followed by 700 ns of low
+const ONE_PULSE: u8 = 0b1100;
+
+type BufferMutex = Mutex<CriticalSectionRawMutex, RefCell<PixelArray>>;
 type ActivationSignal = Signal<CriticalSectionRawMutex, ()>;
-// Ideally we would write all of the pulsecodes at the same time
-// but the RMT only has space for up to 48 pulses, so we split up
-// the pulse codes by pixel. We store 25 pulsecodes, so we have
-// one extra for the end code.
-type PulseCodeArray = [[u32; 25]; PIXEL_COUNT];
-
-#[derive(Copy, Clone)]
-pub struct Ws2812b {
-    state: &'static CommunicationState,
-}
-
-pub struct FrameBuffer<'a> {
-    frame_buffer: &'a mut [[u8; 3]; PIXEL_COUNT],
-}
-
-impl<'a> FrameBuffer<'a> {
-    /// Sets a single pixel.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// frame_buffer.set_pixel(0, (40, 100, 255));
-    /// ```
-    pub fn set_pixel(&mut self, index: usize, rgb: (u8, u8, u8)) {
-        let pixel = &mut self.frame_buffer[index];
-        let (r, g, b) = rgb;
-        pixel[0] = g;
-        pixel[1] = r;
-        pixel[2] = b;
-    }
-
-    /// Gets raw access to the frame_buffer. Note that the pixels are stored in grb format.
-    pub fn raw_mut(&mut self) -> &mut [[u8; 3]; PIXEL_COUNT] {
-        &mut self.frame_buffer
-    }
-}
-
-const CHANNEL: u8 = 0;
-
-impl Ws2812b {
-    /// Initializes the ws2812b driver.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// let rmt = Rmt::new_async(peripherals.RMT, 80.MHz(), &clocks).unwrap();
-    /// let ws2812b = Ws2812b::new(&spawner, rmt.channel0, io.pins.gpio10);
-    /// ```
-    ///
-    pub fn new<'d, P>(
-        spawner: &SendSpawner,
-        channel_creator: ChannelCreator<Async, 0>,
-        pin: impl Peripheral<P = P> + 'd,
-    ) -> Self
-    where
-        P: OutputPin,
-    {
-        static STATE: ConstStaticCell<CommunicationState> =
-            ConstStaticCell::new(CommunicationState {
-                frame_buffer: Mutex::new(RefCell::new([[0; 3]; PIXEL_COUNT])),
-                activation_signal: Signal::new(),
-            });
-        static PULSECODES: ConstStaticCell<PulseCodeArray> =
-            ConstStaticCell::new([[0u32; 25]; PIXEL_COUNT]);
-
-        let state = STATE.take();
-        let pulsecodes = PULSECODES.take();
-
-        let channel = channel_creator
-            .configure(
-                pin,
-                TxChannelConfig {
-                    clk_divider: 1,
-                    idle_output_level: false,
-                    idle_output: true,
-                    carrier_modulation: false,
-                    carrier_high: 1,
-                    carrier_low: 1,
-                    carrier_level: false,
-                },
-            )
-            .unwrap();
-        spawner
-            .spawn(handler(
-                channel,
-                &state.frame_buffer,
-                &state.activation_signal,
-                pulsecodes,
-            ))
-            .unwrap();
-        state.activation_signal.signal(());
-        Self { state }
-    }
-
-    /// Gets access to the frame buffer.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// ws2812b.with_frame_buffer(|mut framebuffer| {
-    ///     framebuffer.set_pixel(0, (40, 100, 255));
-    /// });
-    /// ```
-    pub fn with_frame_buffer<F, R>(&self, f: F) -> R
-    where
-        F: for<'a> FnOnce(&'a mut FrameBuffer<'a>) -> R,
-    {
-        let result = self.state.frame_buffer.lock(|frame_buffer| {
-            let mut frame_buffer = frame_buffer.borrow_mut();
-            f(&mut FrameBuffer {
-                frame_buffer: &mut *frame_buffer,
-            })
-        });
-        self.state.activation_signal.signal(());
-        result
-    }
-
-    /// Sets a single pixel.
-    ///
-    /// Note that if need to set multiple pixels, then it is more effecient to use [`with_frame_buffer`].
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// ws2812b.set_pixel(0, (40, 100, 255));
-    /// ```
-    pub fn set_pixel(&self, index: usize, rgb: (u8, u8, u8)) {
-        self.with_frame_buffer(|frame_buffer| {
-            frame_buffer.set_pixel(index, rgb);
-        });
-    }
-}
-
-type Channel = esp_hal::rmt::Channel<Async, CHANNEL>;
 
 #[embassy_executor::task]
 async fn handler(
-    mut channel: Channel,
-    frame_buffer: &'static BufferMutex,
+    mut frame_buffer: &'static BufferMutex,
     activation_signal: &'static ActivationSignal,
-    pulsecodes: &'static mut PulseCodeArray,
 ) {
-    loop {
-        activation_signal.wait().await;
+    // esp_println::logger::init_logger_from_env();
+    // let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-        const CORRECTIONS: [f32; 3] = [
-            0.3 * 177.0 / 256.0,
-            0.3 * 256.0 / 256.0,
-            0.3 * 241.0 / 256.0,
-        ];
+    // let timer0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
+    // esp_hal_embassy::init(timer0.timer0);
 
-        frame_buffer.lock(|frame_buffer| {
-            let frame_buffer = frame_buffer.borrow();
-            for (chunk, pulsecodes) in frame_buffer.iter().zip(pulsecodes.iter_mut()) {
-                for ((b, pulsecodes), correction) in chunk
-                    .iter()
-                    .zip(pulsecodes.chunks_exact_mut(8))
-                    .zip(CORRECTIONS)
-                {
-                    write_pulse_codes(*b, pulsecodes.try_into().unwrap(), correction);
-                }
-            }
-        });
+    // println!("Embassy initialized!");
 
-        // Send the pulsecodes to the rmt one at a time. Ideally we would write all of them at
-        // once, but it does not have enough ram. We could in principle use wrapping mode, but that
-        // does not work with the async interface.
-        //
-        // In practice this is should be fine: We will get slightly longer pauses between pulses
-        // especially if another task does not yield in time, however slightly longer pauses should
-        // be fine, even if it is somewhat outside the spec.
-        for pulsecode in pulsecodes.iter() {
-            channel.transmit(pulsecode).await.unwrap();
-        }
+    // let mut rng = Rng::new(peripherals.RNG);
 
-        // Datasheet says minimum reset time is 50 microseconds.
-        // some places on the internet says to wait more, but this seems to work okay
-        Timer::after_micros(50).await;
-    }
+    // let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(NUM_SPI_BYTES);
+    // let dma_rx_buf = dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    // let dma_tx_buf = dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    // // The frequency 2857kHz was chosen because 1/2857kHz ~= 350.018 ns, which is pretty close to
+    // // our desired pulse length
+    // //
+    // // However since this exact frequency is not supported by the spi and instead esp-hal will
+    // // choose the closest matching frequency. This closest frequency is 80MHz/28, which corresponds
+    // // to bit-length of exactly 350 ns.
+    // let spi_config = spi::master::Config::default().with_frequency(Rate::from_khz(2857));
+
+    // let mut spidma = spi::master::Spi::new(peripherals.SPI2, spi_config)
+    //     .unwrap()
+    //     .with_mosi(peripherals.GPIO10)
+    //     .with_dma(peripherals.DMA_CH0)
+    //     .with_buffers(dma_rx_buf, dma_tx_buf)
+    //     .into_async();
+
+    // let pixels = mk_static!(PixelArray, [Pixel::BLACK; NUM_PIXELS]);
+    // let pulsecodes = mk_static!(PulseCodeArray, [0; NUM_SPI_BYTES]);
+
+    // // When starting the spi, it will idle as high, which means that
+    // // from the point of view of the ws2812b we have already started
+    // // transmissing at this point.
+    // //
+    // // While esp-hal configures the spi to idle as low, this only takes
+    // // effect after the first transmission.
+    // //
+    // // To fix this, we transmit a burst of zeros. To also get the ws2812b to
+    // // abort the current transmission, we wait for 100 µs in order to reset it.
+    // spidma.write_async(&[0]).await.unwrap();
+    // Timer::after(Duration::from_micros(100)).await;
+
+    // loop {
+    //     for p in &mut *pixels {
+    //         let d = rng.random();
+    //         p.r = (d as u8) & 0x7;
+    //         p.g = ((d >> 8) as u8) & 0x7;
+    //         p.b = ((d >> 16) as u8) & 0x7;
+    //     }
+
+    //     for (pixel, pulsecode) in pixels.iter_mut().zip(pulsecodes.chunks_mut(3 * 4)) {
+    //         pulsecode[0..4].copy_from_slice(&pixel_to_pulsecodes(pixel.g));
+    //         pulsecode[4..8].copy_from_slice(&pixel_to_pulsecodes(pixel.r));
+    //         pulsecode[8..12].copy_from_slice(&pixel_to_pulsecodes(pixel.b));
+    //     }
+
+    //     spidma.write_async(&*pulsecodes).await.unwrap();
+    //     Timer::after(Duration::from_millis(500)).await;
+    // }
 }
 
-#[inline(always)]
-fn write_pulse_codes(byte: u8, out: &mut [u32; 8], correction: f32) {
-    // These numbers do *not* match the datasheet, they match https://github.com/karlri/esp32-rmt-ws2812b/blob/main/src/lib.rs
-    // We make the zero pulses shorter and the one pulses longer. This seems to work okay
-    const ZERO: PulseCode = PulseCode {
-        level1: true,
-        // length1: 32, // 400 ns * 80 MHz = 32 ticks
-        length1: 20, // 250 ns * 80 MHz = 32 ticks
-        level2: false,
-        // length2: 68, // 850 ns * 80 MHz = 68 ticks
-        length2: 80, // 1000 ns * 80 MHz = 68 ticks
-    };
-    const ONE: PulseCode = PulseCode {
-        level1: true,
-        // length1: 64, // 800 ns * 80 MHz = 64 ticks
-        length1: 70, // 875 ns * 80 MHz = 64 ticks
-        level2: false,
-        // length2: 34, // 450 ns * 80 MHz = 36 ticks
-        length2: 30, // 375 ns * 80 MHz = 36 ticks
-    };
-    // The buffer for the pulse codes is already big enough, so we only store the packed pulse codes.
-    const ZERO_BITS: u32 = (0 << 31) | (80 << 16) | (1 << 15) | (20 << 0);
-    const ONE_BITS: u32 = (0 << 31) | (30 << 16) | (1 << 15) | (70 << 0);
-
-    // Sanity check that we got the conversion right.
-    debug_assert_eq!(u32::from(ZERO), ZERO_BITS);
-    debug_assert_eq!(u32::from(ONE), ONE_BITS);
-
-    // Write out the bits one at a time, starting with the most significant bit.
-    // This code is a bit weird-looking, because Tethys decided to do a silly
-    // micro-optimization instead of writing the most readable version
-    let byte = ((byte as f32) * correction).round() as u8;
-    let mut byte = (byte as u32) << 24;
-    for out in out {
-        *out = if (byte & 0x80000000) == 0 {
-            ZERO_BITS
-        } else {
-            ONE_BITS
-        };
-        byte <<= 1;
-    }
+fn pixel_to_pulsecodes(byte: u8) -> [u8; 4] {
+    const PULSECODES: [u8; 4] = [
+        ZERO_PULSE << 4 | ZERO_PULSE,
+        ZERO_PULSE << 4 | ONE_PULSE,
+        ONE_PULSE << 4 | ZERO_PULSE,
+        ONE_PULSE << 4 | ONE_PULSE,
+    ];
+    [
+        PULSECODES[((byte >> 6) & 0b11) as usize],
+        PULSECODES[((byte >> 4) & 0b11) as usize],
+        PULSECODES[((byte >> 2) & 0b11) as usize],
+        PULSECODES[((byte >> 0) & 0b11) as usize],
+    ]
 }
