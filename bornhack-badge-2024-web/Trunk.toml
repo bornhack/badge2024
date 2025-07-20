@@ -6,6 +6,7 @@ public_url = "/"
 
 [tools]
 tailwindcss = "3.3.5"
+wasm_bindgen = "0.2.100"
 
 # dev board
 # [[proxy]]

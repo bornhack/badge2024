@@ -1,7 +1,6 @@
-use ev::Event;
 use feature_creep_types::{Command, Message};
-use leptos::*;
-use leptos_use::{core::ConnectionReadyState, use_websocket, UseWebsocketReturn};
+use leptos::{ev::Event, prelude::*, server::codee::string::JsonSerdeCodec};
+use leptos_use::{core::ConnectionReadyState, use_websocket, UseWebSocketReturn};
 
 fn main() {
     mount_to_body(|| App())
@@ -9,8 +8,8 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    let (read_input_hostname, write_input_hostname) = create_signal::<String>("".to_string());
-    let (read_hostname, write_hostname) = create_signal::<Option<String>>(None);
+    let (read_input_hostname, write_input_hostname) = signal::<String>("".to_string());
+    let (read_hostname, write_hostname) = signal::<Option<String>>(None);
 
     view! {
         <div class="flex flex-col gap-2 items-center py-8">
@@ -45,23 +44,21 @@ fn App() -> impl IntoView {
 fn InitializedApp(hostname: String) -> impl IntoView {
     let ws_url = format!("ws://{}/ws", hostname);
 
-    let UseWebsocketReturn {
+    let UseWebSocketReturn {
         ready_state,
-        message_bytes,
-        send_bytes,
+        message,
+        send,
         ..
-    } = use_websocket(&ws_url);
+    } = use_websocket::<Vec<u8>, Vec<u8>, JsonSerdeCodec>(&ws_url);
 
-    let colors: Vec<_> = (0..16)
-        .map(|_| create_signal("#00000000".to_string()))
-        .collect();
+    let colors: Vec<_> = (0..16).map(|_| signal("#00000000".to_string())).collect();
 
-    let (position, position_set) = create_signal(String::new());
+    let (position, position_set) = signal(String::new());
 
     {
         let colors = colors.clone();
-        create_effect(move |_| {
-            if let Some(m) = message_bytes.get() {
+        Effect::new(move |_| {
+            if let Some(m) = message.get() {
                 let res: Message = serde_json::from_slice(&m).unwrap();
                 match res {
                     Message::CurrentColors(cur_colors) => {
@@ -78,43 +75,43 @@ fn InitializedApp(hostname: String) -> impl IntoView {
     }
 
     let turn_off = {
-        let send_bytes = send_bytes.clone();
+        let send = send.clone();
         move |_| {
             for index in 0..16 {
-                send_bytes(
-                    serde_json::to_vec(&Command::ChangeColor {
+                send(
+                    &serde_json::to_vec(&Command::ChangeColor {
                         index,
                         rgb: (0, 0, 0),
                     })
                     .unwrap(),
                 );
             }
-            send_bytes(serde_json::to_vec(&Command::QueryColors).unwrap());
+            send(&serde_json::to_vec(&Command::QueryColors).unwrap());
         }
     };
 
     let random_colors = {
-        let send_bytes = send_bytes.clone();
+        let send = send.clone();
         move |_| {
             for index in 0..16 {
-                send_bytes(
-                    serde_json::to_vec(&Command::ChangeColor {
+                send(
+                    &serde_json::to_vec(&Command::ChangeColor {
                         index,
                         rgb: rand::random(),
                     })
                     .unwrap(),
                 );
             }
-            send_bytes(serde_json::to_vec(&Command::QueryColors).unwrap());
+            send(&serde_json::to_vec(&Command::QueryColors).unwrap());
         }
     };
 
     {
-        let send_bytes = send_bytes.clone();
-        create_effect(move |_| {
+        let send = send.clone();
+        Effect::new(move |_| {
             let state = ready_state.get();
             if matches!(state, ConnectionReadyState::Open) {
-                send_bytes(serde_json::to_vec(&Command::QueryColors).unwrap());
+                send(&serde_json::to_vec(&Command::QueryColors).unwrap());
             }
         });
     }
@@ -123,7 +120,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
         <div class="flex flex-col gap-2">
             <div class="flex w-[800px] h-[325px] bg-[url('/board.png')] items-center">
                 <div class="flex gap-4 ml-24 bg-[#8888] px-4 py-4 rounded-lg">
-                    { (0..16).into_iter().map(|i| view!{ <Led index=i color=colors[i] send_func=send_bytes.clone() /> }).collect_view() }
+                    { (0..16).into_iter().map(|i| view!{ <Led index=i color=colors[i] send_func=send.clone() /> }).collect_view() }
                 </div>
             </div>
             <div class="flex gap-2">
@@ -154,7 +151,7 @@ fn InitializedApp(hostname: String) -> impl IntoView {
 fn Led(
     index: usize,
     color: (ReadSignal<String>, WriteSignal<String>),
-    send_func: impl Fn(Vec<u8>) + 'static,
+    send_func: impl Fn(&Vec<u8>) + 'static,
 ) -> impl IntoView {
     let (color, set_color) = color;
 
@@ -168,7 +165,7 @@ fn Led(
                 let r = u8::from_str_radix(&new_value[1..3], 16).unwrap();
                 let g = u8::from_str_radix(&new_value[3..5], 16).unwrap();
                 let b = u8::from_str_radix(&new_value[5..7], 16).unwrap();
-                send_func(serde_json::to_vec(&Command::ChangeColor { index: index as u8, rgb: (r,g,b) }).unwrap() );
+                send_func(&serde_json::to_vec(&Command::ChangeColor { index: index as u8, rgb: (r,g,b) }).unwrap() );
                 set_color.set(new_value);
         } />
     }
