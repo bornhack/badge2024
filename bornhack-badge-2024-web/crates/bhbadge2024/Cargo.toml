@@ -5,25 +5,20 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-accelerometer = "0.12.0"
-esp-backtrace = { version = "0.17", features = [
-    "esp32c3",
-    "exception-handler",
-    "panic-handler",
-    "println",
-] }
-esp-hal = { version = "1.0.0-rc.0", features = ["esp32c3", "unstable"] }
-esp-hal-embassy = { version = "0.9.0", features = ["esp32c3"] }
-esp-println = { version = "0.15.0", features = ["esp32c3", "log-04"] }
-esp-wifi = { version = "0.15.0", features = ["esp32c3"] }
-embassy-executor = "0.7.0"
-embassy-sync = "0.7.0"
-embassy-time = "0.4.0"
-static_cell = "2.1.0"
-cast = "0.3.0"
-num-traits = { version = "0.2.19", default-features = false }
-num-derive = { version = "0.4.2", default-features = false }
-micromath = "2.1.0"
+accelerometer.workspace = true
+esp-backtrace.workspace = true
+esp-hal.workspace = true
+esp-hal-embassy.workspace = true
+esp-println.workspace = true
+esp-wifi.workspace = true
+embassy-executor.workspace = true
+embassy-sync.workspace = true
+embassy-time.workspace = true
+static_cell.workspace = true
+cast.workspace = true
+num-traits.workspace = true
+num-derive.workspace = true
+micromath.workspace = true
 
 [features]
 default = ["out_f32"]

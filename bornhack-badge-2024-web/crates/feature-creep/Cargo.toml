@@ -4,22 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bhbadge2024.path = "../bhbadge2024"
-feature-creep-types.path = "../feature-creep-types"
-esp-hal-embassy = "0.9.0"
-esp-hal = { version = "1.0.0-rc.0", features = ["esp32c3"] }
-embassy-executor = "0.7.0"
-embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
-esp-println = "0.15.0"
-esp-wifi = { version = "0.15.0", features = ["esp32c3", "wifi"] }
-static_cell = "2.1.0"
-embassy-net = { version = "0.7.0", features = [
-    "proto-ipv4",
-    "dhcpv4",
-    "tcp",
-    "dns",
-] }
-picoserve = { version = "0.16.0", features = ["embassy"] }
-serde-json-core = "0.5.1"
-embassy-sync = "0.7.0"
-embassy-futures = "0.1.1"
+bhbadge2024.workspace = true
+feature-creep-types.workspace = true
+
+esp-hal-embassy.workspace = true
+esp-hal.workspace = true
+embassy-executor.workspace = true
+embassy-time.workspace = true
+esp-println.workspace = true
+esp-wifi.workspace = true
+static_cell.workspace = true
+embassy-net.workspace = true
+picoserve.workspace = true
+serde-json-core.workspace = true
+embassy-sync.workspace = true
+embassy-futures.workspace = true
