@@ -4,6 +4,7 @@
 
 extern crate alloc;
 
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal_embassy::main;
 
@@ -23,7 +24,7 @@ use embassy_sync::{
     pubsub::{PubSubChannel, Publisher},
 };
 use embassy_time::Timer;
-use esp_hal::{clock::CpuClock, i2c::master::I2c, rng::Rng, time::Rate};
+use esp_hal::{clock::CpuClock, i2c::master::I2c, rng::Rng, time::Rate, timer::timg::TimerGroup};
 use webserver::{AppState, WEB_TASK_POOL_SIZE};
 
 #[macro_export]
@@ -38,10 +39,18 @@ macro_rules! mk_static {
 
 #[main]
 async fn main(spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    let timer0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timer0.timer0);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let timg1 = TimerGroup::new(peripherals.TIMG1);
+    let rng = Rng::new(peripherals.RNG);
+
+    esp_hal_embassy::init(timg1.timer0);
+
+    let stack = wifi::init_wifi(&spawner, timg0.timer0, rng, peripherals.WIFI).await;
 
     let ws2812b = ws2812b::init_ws2812b(
         spawner,
@@ -49,11 +58,6 @@ async fn main(spawner: Spawner) {
         peripherals.GPIO10,
         peripherals.DMA_CH0,
     );
-
-    let timer1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
-    let rng = Rng::new(peripherals.RNG);
-
-    let stack = wifi::init_wifi(&spawner, timer1.timer0, rng, peripherals.WIFI).await;
 
     let channel = PubSubChannel::<NoopRawMutex, (F32x3, f32), 1, WEB_TASK_POOL_SIZE, 1>::new();
     let app_state: &'static AppState = mk_static!(AppState, AppState { ws2812b, channel });

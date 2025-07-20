@@ -4,13 +4,13 @@ exclude = ["crates/frontend"]
 resolver = "2"
 
 [workspace.dependencies]
-feature-creep = { path = "crates/feature-creep" }
-feature-creep-types = { path = "crates/feature-creep-types" }
-frontend = { path = "crates/frontend" }
+feature-creep.path = "crates/feature-creep"
+feature-creep-types.path = "crates/feature-creep-types"
+frontend.path = "crates/frontend"
 
 accelerometer = "0.12.0"
 cast = "0.3.0"
-embassy-executor = "0.7.0"
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-131072"] }
 embassy-futures = "0.1.1"
 embassy-net = { version = "0.7.0", features = [
     "proto-ipv4",
@@ -20,6 +20,7 @@ embassy-net = { version = "0.7.0", features = [
 ] }
 embassy-sync = "0.7.0"
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
+esp-alloc = "0.8.0"
 esp-backtrace = { version = "0.17", features = [
     "esp32c3",
     "exception-handler",

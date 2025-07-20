@@ -13,6 +13,7 @@ embassy-futures.workspace = true
 embassy-net.workspace = true
 embassy-sync.workspace = true
 embassy-time.workspace = true
+esp-alloc.workspace = true
 esp-backtrace.workspace = true
 esp-hal.workspace = true
 esp-hal-embassy.workspace = true
