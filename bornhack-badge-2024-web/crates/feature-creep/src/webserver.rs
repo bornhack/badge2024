@@ -21,7 +21,7 @@ use picoserve::{
     Router,
 };
 
-pub const WEB_TASK_POOL_SIZE: usize = 3;
+pub const WEB_TASK_POOL_SIZE: usize = 5;
 
 struct WebsocketHandler {
     ws2812b: Ws2812b,

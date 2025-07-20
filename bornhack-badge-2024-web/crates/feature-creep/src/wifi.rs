@@ -12,11 +12,13 @@ use esp_wifi::{
     EspWifiController,
 };
 
+use crate::webserver::WEB_TASK_POOL_SIZE;
+
 const WIFI_SSID: &str = env!("WIFI_SSID");
 const WIFI_USERNAME: Option<&str> = option_env!("WIFI_USERNAME");
 const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
-pub const MAX_CONNECTIONS: usize = 5;
+pub const MAX_CONNECTIONS: usize = 3 + WEB_TASK_POOL_SIZE;
 
 pub async fn init_wifi(
     spawner: &Spawner,
