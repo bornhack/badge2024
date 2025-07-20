@@ -1,5 +1,6 @@
 use crate::{
     lis2dh12::F32x3,
+    webserver_file,
     ws2812b::{Pixel, Ws2812b},
 };
 use embassy_executor::Spawner;
@@ -146,36 +147,36 @@ async fn websocket(
 
 fn make_app(
 ) -> picoserve::Router<impl picoserve::routing::PathRouter<&'static AppState>, &'static AppState> {
-    // static INDEX: &str = include_str!("../dist/index.html");
+    static INDEX: &str = include_str!("../dist/index.html");
     Router::new()
-        // .route("/", get(|| webserver_file::File::html(INDEX)))
-        // .route("/index.html", get(|| webserver_file::File::html(INDEX)))
-        // .route(
-        //     "/frontend.js",
-        //     get(|| webserver_file::File::javascript(include_str!("../dist/frontend.js"))),
-        // )
-        // .route(
-        //     "/tailwind.css",
-        //     get(|| webserver_file::File::css(include_str!("../dist/tailwind.css"))),
-        // )
-        // .route(
-        //     "/frontend_bg.wasm",
-        //     get(|| {
-        //         webserver_file::File::with_content_type(
-        //             "application/wasm",
-        //             include_bytes!("../dist/frontend_bg.wasm"),
-        //         )
-        //     }),
-        // )
-        // .route(
-        //     "/board.png",
-        //     get(|| {
-        //         webserver_file::File::with_content_type(
-        //             "image/png",
-        //             include_bytes!("../dist/board.png"),
-        //         )
-        //     }),
-        // )
+        .route("/", get(|| webserver_file::File::html(INDEX)))
+        .route("/index.html", get(|| webserver_file::File::html(INDEX)))
+        .route(
+            "/frontend.js",
+            get(|| webserver_file::File::javascript(include_str!("../dist/frontend.js"))),
+        )
+        .route(
+            "/tailwind.css",
+            get(|| webserver_file::File::css(include_str!("../dist/tailwind.css"))),
+        )
+        .route(
+            "/frontend_bg.wasm",
+            get(|| {
+                webserver_file::File::with_content_type(
+                    "application/wasm",
+                    include_bytes!("../dist/frontend_bg.wasm"),
+                )
+            }),
+        )
+        .route(
+            "/board.png",
+            get(|| {
+                webserver_file::File::with_content_type(
+                    "image/png",
+                    include_bytes!("../dist/board.png"),
+                )
+            }),
+        )
         .route("/ws", get(websocket))
 }
 

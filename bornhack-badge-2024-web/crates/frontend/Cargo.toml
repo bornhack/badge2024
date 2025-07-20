@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-leptos = { version = "0.6.12", features = ["csr", "nightly"] }
+leptos = { version = "0.6.12", features = ["csr"] }
 leptos-use = "0.10.10"
 
 feature-creep-types = { path = "../feature-creep-types" }

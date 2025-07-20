@@ -24,16 +24,13 @@ pub async fn init_wifi(
     mut rng: Rng,
     wifi: WIFI<'static>,
 ) -> Stack<'static> {
-    println!("A?");
     let init = mk_static!(
         EspWifiController<'static>,
         esp_wifi::init(timer, rng).unwrap()
     );
-    println!("B?");
 
     let (controller, wifi_interfaces) = esp_wifi::wifi::new(init, wifi).unwrap();
 
-    println!("C?");
     let config = embassy_net::Config::dhcpv4(Default::default());
 
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;

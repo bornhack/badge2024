@@ -10,6 +10,7 @@ use esp_hal::{
     time::Rate,
     Async,
 };
+use micromath::F32Ext;
 
 const NUM_PIXELS: usize = 16;
 // 3 colors per pixel, 1 byte per color, 4 bits of spi data per bit of color data
@@ -108,6 +109,11 @@ async fn handler(
     activation_signal: &'static ActivationSignal,
 ) {
     let pulsecodes = mk_static!(PulseCodeArray, [0; NUM_SPI_BYTES]);
+    const CORRECTIONS: [f32; 3] = [
+        0.3 * 177.0 / 256.0,
+        0.3 * 256.0 / 256.0,
+        0.3 * 241.0 / 256.0,
+    ];
     loop {
         activation_signal.wait().await;
         frame_buffer.lock(|pixels| {
@@ -117,16 +123,17 @@ async fn handler(
                 .iter_mut()
                 .zip(pulsecodes.chunks_mut(3 * 4))
             {
-                pulsecode[0..4].copy_from_slice(&pixel_to_pulsecodes(pixel.g));
-                pulsecode[4..8].copy_from_slice(&pixel_to_pulsecodes(pixel.r));
-                pulsecode[8..12].copy_from_slice(&pixel_to_pulsecodes(pixel.b));
+                pulsecode[0..4].copy_from_slice(&pixel_to_pulsecodes(pixel.g, CORRECTIONS[0]));
+                pulsecode[4..8].copy_from_slice(&pixel_to_pulsecodes(pixel.r, CORRECTIONS[1]));
+                pulsecode[8..12].copy_from_slice(&pixel_to_pulsecodes(pixel.b, CORRECTIONS[2]));
             }
         });
         spidma.write_async(&*pulsecodes).await.unwrap();
     }
 }
 
-fn pixel_to_pulsecodes(byte: u8) -> [u8; 4] {
+fn pixel_to_pulsecodes(byte: u8, correction: f32) -> [u8; 4] {
+    let byte = ((byte as f32) * correction).round() as u8;
     const PULSECODES: [u8; 4] = [
         ZERO_PULSE << 4 | ZERO_PULSE,
         ZERO_PULSE << 4 | ONE_PULSE,

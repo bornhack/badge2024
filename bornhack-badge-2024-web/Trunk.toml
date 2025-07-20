@@ -1,7 +1,7 @@
 [build]
-target = "frontend/index.html"
+target = "crates/frontend/index.html"
 filehash = false
-dist = "apps/feature-creep/dist"
+dist = "crates/feature-creep/dist"
 public_url = "/"
 
 [tools]

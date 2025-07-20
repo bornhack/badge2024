@@ -169,7 +169,7 @@ fn Led(
                 let g = u8::from_str_radix(&new_value[3..5], 16).unwrap();
                 let b = u8::from_str_radix(&new_value[5..7], 16).unwrap();
                 send_func(serde_json::to_vec(&Command::ChangeColor { index: index as u8, rgb: (r,g,b) }).unwrap() );
-                set_color(new_value);
+                set_color.set(new_value);
         } />
     }
 }
