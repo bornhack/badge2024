@@ -1,6 +1,6 @@
 [workspace]
-members = ["apps/*", "libs/*"]
-exclude = ["frontend"]
+members = ["crates/*"]
+exclude = ["crates/frontend"]
 resolver = "2"
 
 [profile.dev]

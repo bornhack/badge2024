@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 #![allow(long_running_const_eval)]
 
 pub mod webserver;
