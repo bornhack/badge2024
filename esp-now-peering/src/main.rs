@@ -15,6 +15,8 @@ use esp_wifi::{
     esp_now::{EspNowSender, PeerInfo},
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();

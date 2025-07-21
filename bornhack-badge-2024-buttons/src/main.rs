@@ -11,6 +11,8 @@ use esp_hal::{
 use esp_hal_embassy::main;
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));

@@ -16,6 +16,8 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 
 const ANNOUNCEMENT: &str = env!("ANNOUNCEMENT");
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));

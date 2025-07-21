@@ -18,6 +18,7 @@ esp-backtrace.workspace = true
 esp-hal.workspace = true
 esp-hal-embassy.workspace = true
 esp-println.workspace = true
+esp-bootloader-esp-idf.workspace = true
 esp-wifi.workspace = true
 micromath.workspace = true
 num-derive.workspace = true

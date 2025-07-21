@@ -12,6 +12,8 @@ use esp_println::println;
 
 use crate::lis2dh12::Lis2dh12;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));

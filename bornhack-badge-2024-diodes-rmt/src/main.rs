@@ -35,6 +35,8 @@ type PixelArray = [Pixel; NUM_PIXELS];
 // one extra for the end code.
 type PulseCodeArray = [[u32; 25]; NUM_PIXELS];
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();

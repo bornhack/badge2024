@@ -34,6 +34,8 @@ const ZERO_PULSE: u8 = 0b1000;
 // This corresponds to 700 ns of high followed by 700 ns of low
 const ONE_PULSE: u8 = 0b1100;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
