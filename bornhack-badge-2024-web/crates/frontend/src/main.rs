@@ -7,7 +7,7 @@ use leptos_use::{core::ConnectionReadyState, use_websocket, UseWebSocketReturn};
 use crate::binary_json::BinaryJsonSerdeCodec;
 
 fn main() {
-    mount_to_body(|| App())
+    mount_to_body(App)
 }
 
 #[component]
@@ -22,7 +22,7 @@ fn App() -> impl IntoView {
 #[component]
 fn InitializedApp() -> impl IntoView {
     let hostname = document().location().unwrap().host().unwrap();
-    let ws_url = format!("ws://{}/ws", hostname);
+    let ws_url = format!("ws://{hostname}/ws");
 
     let UseWebSocketReturn {
         ready_state,
@@ -93,7 +93,7 @@ fn InitializedApp() -> impl IntoView {
         <div class="flex flex-col gap-2">
             <div class="flex w-[800px] h-[325px] bg-[url('/board.png')] items-center">
                 <div class="flex gap-4 ml-24 bg-[#8888] px-4 py-4 rounded-lg">
-                    { (0..16).into_iter().map(|i| view!{ <Led index=i color=colors[i] send_func=send.clone() /> }).collect_view() }
+                    { (0..16).map(|i| view!{ <Led index=i color=colors[i] send_func=send.clone() /> }).collect_view() }
                 </div>
             </div>
             <div class="flex gap-2">
