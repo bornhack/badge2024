@@ -4,6 +4,26 @@ version = 4
 
 [[package]]
 name = "accelerometer"
+version = "0.1.0"
+dependencies = [
+ "accelerometer 0.12.0",
+ "cast",
+ "embassy-executor",
+ "embassy-sync 0.7.0",
+ "embassy-time",
+ "embedded-io-async",
+ "esp-backtrace",
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "num-derive",
+ "num-traits",
+ "static_cell",
+]
+
+[[package]]
+name = "accelerometer"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a4586d95cb0695e748760c9a751141eebb68265b1b20392a0f14db608679f7a"
@@ -57,26 +77,6 @@ name = "bitflags"
 version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
-
-[[package]]
-name = "bornhack-badge-2024-accelerometer"
-version = "0.1.0"
-dependencies = [
- "accelerometer",
- "cast",
- "embassy-executor",
- "embassy-sync 0.7.0",
- "embassy-time",
- "embedded-io-async",
- "esp-backtrace",
- "esp-bootloader-esp-idf",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "num-derive",
- "num-traits",
- "static_cell",
-]
 
 [[package]]
 name = "bytemuck"

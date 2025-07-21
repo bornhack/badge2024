@@ -13,7 +13,7 @@ pub(crate) async fn run_scanner(
         esp_wifi::init(timer, rng).unwrap()
     );
 
-    let (mut controller, _) = esp_wifi::wifi::new(&init, wifi).unwrap();
+    let (mut controller, _) = esp_wifi::wifi::new(init, wifi).unwrap();
 
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());

@@ -36,7 +36,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_wifi::init(timg0.timer0, rng).unwrap()
     );
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();

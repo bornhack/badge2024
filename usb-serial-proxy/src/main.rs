@@ -57,8 +57,8 @@ async fn main(spawner: Spawner) {
             Err(e) => {
                 use core::fmt::Write;
                 s.clear();
-                let _ = write!(&mut s, "Error: {e:?}\n");
-                let Ok(_) = usb_tx.write_all(&s.as_bytes()).await;
+                let _ = writeln!(&mut s, "Error: {e:?}");
+                let Ok(_) = usb_tx.write_all(s.as_bytes()).await;
                 let Ok(()) = usb_tx.flush().await;
                 Timer::after_millis(50).await;
             }
