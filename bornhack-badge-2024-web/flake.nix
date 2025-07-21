@@ -31,7 +31,7 @@
             (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
 
             # Flashing tool
-            # espflash
+            espflash
 
             # frontend
             trunk
