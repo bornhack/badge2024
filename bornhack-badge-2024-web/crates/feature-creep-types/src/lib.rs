@@ -1,15 +1,4 @@
 #![no_std]
-//use core::prelude::rust_2021::derive;
-//use serde::{Deserialize, Serialize};
-//
-//#[derive(Deserialize, Serialize)]
-//pub enum Command {
-//    ChangeColor(&'static str),
-//}
-//
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Update {}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Command {
