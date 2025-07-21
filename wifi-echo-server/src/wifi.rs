@@ -10,8 +10,8 @@ use esp_wifi::{
 
 pub const MAX_CONNECTIONS: usize = 4;
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+const SSID: &str = env!("WIFI_SSID");
+const PASSWORD: &str = env!("WIFI_PASSWORD");
 
 pub(crate) fn init_wifi(
     spawner: &Spawner,
